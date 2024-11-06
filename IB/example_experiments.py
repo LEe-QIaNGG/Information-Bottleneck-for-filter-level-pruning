@@ -1,5 +1,5 @@
-from IB import *
-from data_generation import *
+from IB.IB import *
+from IB.data_generation import *
 import os
 
 def test_IB_single():   
@@ -34,3 +34,6 @@ def test_IB():
     metrics_conv, dist_conv, metrics_sw, dist_sw = IB(ds,fit_param)
     
     return metrics_conv, dist_conv, metrics_sw, dist_sw
+
+if __name__ == "__main__":
+    test_IB()

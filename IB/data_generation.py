@@ -1,4 +1,4 @@
-from IB import *
+from IB.IB import *
 import matplotlib.pyplot as plt
 import os
 import numpy as np

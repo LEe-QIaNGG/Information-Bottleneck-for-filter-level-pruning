@@ -780,8 +780,8 @@ class model:
         """Appends current model / stats to the internal stepwise dataframe."""
         if self.keep_steps:
             # store stepwise data                
-            self.metrics_sw = self.metrics_sw.append(self.panda(), ignore_index = True)
-            if bool(self.dist_to_keep): self.dist_sw = self.dist_sw.append(self.panda(self.dist_to_keep), ignore_index = True)
+            self.metrics_sw = self.metrics_sw._append(self.panda(), ignore_index = True)
+            if bool(self.dist_to_keep): self.dist_sw = self.dist_sw._append(self.panda(self.dist_to_keep), ignore_index = True)
 
     def check_converged(self):
         """Checks if most recent step triggered convergence, and stores step /
@@ -1204,8 +1204,8 @@ def IB(ds,fit_param,paramID=None,conv_dist_to_keep={'qt_x','qt','qy_t','Dxt'},
                 # once converged and sw models extracted, clamp if necessary
                 if this_clamp and this_alpha!=0:
                     m.clamp()
-                    this_metrics_conv = this_metrics_conv.append(m.panda(), ignore_index = True)
-                    if bool(conv_dist_to_keep): this_dist_conv = this_dist_conv.append(m.panda(conv_dist_to_keep), ignore_index = True)
+                    this_metrics_conv = this_metrics_conv._append(m.panda(), ignore_index = True)
+                    if bool(conv_dist_to_keep): this_dist_conv = this_dist_conv._append(m.panda(conv_dist_to_keep), ignore_index = True)
                     
                 # if also running geoapprox...
                 if this_geoapprox:
@@ -1243,16 +1243,16 @@ def IB(ds,fit_param,paramID=None,conv_dist_to_keep={'qt_x','qt','qy_t','Dxt'},
                     this_dist_sw['fitIDwrep'] = fitIDwrep
                     
                 # add this repeat to these repeats
-                if these_metrics_conv is not None: these_metrics_conv = these_metrics_conv.append(this_metrics_conv, ignore_index = True)
+                if these_metrics_conv is not None: these_metrics_conv = these_metrics_conv._append(this_metrics_conv, ignore_index = True)
                 else: these_metrics_conv = this_metrics_conv
                 if keep_steps:
-                    if these_metrics_sw is not None: these_metrics_sw = these_metrics_sw.append(this_metrics_sw, ignore_index = True)
+                    if these_metrics_sw is not None: these_metrics_sw = these_metrics_sw._append(this_metrics_sw, ignore_index = True)
                     else: these_metrics_sw = this_metrics_sw
                 if bool(conv_dist_to_keep):
-                    if these_dist_conv is not None: these_dist_conv = these_dist_conv.append(this_dist_conv, ignore_index = True)
+                    if these_dist_conv is not None: these_dist_conv = these_dist_conv._append(this_dist_conv, ignore_index = True)
                     else: these_dist_conv = this_dist_conv
                 if bool(sw_dist_to_keep):
-                    if these_dist_sw is not None: these_dist_sw = these_dist_sw.append(this_dist_sw, ignore_index = True)
+                    if these_dist_sw is not None: these_dist_sw = these_dist_sw._append(this_dist_sw, ignore_index = True)
                     else: these_dist_sw = this_dist_sw
             # end of repeat fit loop for single beta
             print('+'*15+' finished these repeats '+'+'*15)
@@ -1341,16 +1341,16 @@ def IB(ds,fit_param,paramID=None,conv_dist_to_keep={'qt_x','qt','qy_t','Dxt'},
                 these_dist_sw.loc[these_dist_sw['repeat'] == best_repeat, 'bestrep'] = True
                 
             # store repeats in primary dataframe
-            if metrics_conv is not None: metrics_conv = metrics_conv.append(these_metrics_conv, ignore_index = True)
+            if metrics_conv is not None: metrics_conv = metrics_conv._append(these_metrics_conv, ignore_index = True)
             else: metrics_conv = these_metrics_conv
             if keep_steps:
-                if metrics_sw is not None: metrics_sw = metrics_sw.append(these_metrics_sw, ignore_index = True)
+                if metrics_sw is not None: metrics_sw = metrics_sw._append(these_metrics_sw, ignore_index = True)
                 else: metrics_sw = these_metrics_sw
             if bool(conv_dist_to_keep):
-                if dist_conv is not None: dist_conv = dist_conv.append(these_dist_conv, ignore_index = True)
+                if dist_conv is not None: dist_conv = dist_conv._append(these_dist_conv, ignore_index = True)
                 else: dist_conv = these_dist_conv
             if bool(sw_dist_to_keep):
-                if dist_sw is not None: dist_sw = dist_sw.append(these_dist_sw, ignore_index = True)
+                if dist_sw is not None: dist_sw = dist_sw._append(these_dist_sw, ignore_index = True)
                 else: dist_sw = these_dist_sw
 
             # advance fit counters
