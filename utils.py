@@ -7,19 +7,33 @@ def evaluate(model, test_loader, device):
     model.eval()
     correct = 0
     total = 0
+    total_time = 0
     with torch.no_grad():
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
+            
+            # 记录推理开始时间
+            start_time = torch.cuda.Event(enable_timing=True)
+            end_time = torch.cuda.Event(enable_timing=True)
+            start_time.record()
+            
             outputs = model(data)
+            
+            # 记录推理结束时间
+            end_time.record()
+            torch.cuda.synchronize()
+            total_time += start_time.elapsed_time(end_time)
+            
             _, predicted = torch.max(outputs.data, 1)
             total += target.size(0)
             correct += (predicted == target).sum().item()
-    return 100 * correct / total
+            
+    accuracy = 100 * correct / total
+    avg_time = total_time / len(test_loader)  # 计算平均推理时间
+    return accuracy, avg_time
 
-def plot_layer_mutual_information(I_XT, I_TY, layer_name,epoch,beta=2):
+def plot_layer_mutual_information(information_plane, layer_name,epoch,):
     plt.figure(figsize=(6, 4))
-    # 计算 I(X;T) - beta*I(T;Y)
-    information_plane = np.array(I_XT) - beta * np.array(I_TY)
     # 计算第50%分位数
     median = np.median(information_plane)
     plt.hist(information_plane, bins=20, alpha=0.7, label='I(X;T) - beta*I(T;Y)')
