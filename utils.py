@@ -47,29 +47,38 @@ def plot_layer_mutual_information(information_plane, layer_name,epoch,logdir):
     plt.savefig(f'{logdir}/{layer_name}_information_bottleneck_{epoch}.png')
     plt.close()
 
-def plot_training_curves(epoch_losses, test_accuracies, test_times, num_epochs, logdir):
-    plt.figure(figsize=(10, 4))
-    
+def plot_training_curves(epoch_losses, test_accuracies, test_times, logdir, pruning_epochs=[],is_prune=False):
+    num_epochs = len(epoch_losses)
     # 绘制训练损失曲线
-    plt.subplot(1, 2, 1)
+    plt.figure(figsize=(10, 4))
+    plt.subplot(1, 1, 1)
     plt.plot(range(1, num_epochs + 1), epoch_losses, 'b-')
-    plt.title('训练损失曲线')
+    plt.title('training loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
+    plt.tight_layout()
+    plt.savefig(f'{logdir}/training_loss.png')
+    plt.close()
 
-    # 绘制准确率曲线
-    plt.subplot(1, 2, 2)
-    plt.plot(range(1, num_epochs + 1), test_accuracies, 'r-', label='准确率')
+    # 绘制准确率和归一化推理速度曲线
+    plt.figure(figsize=(10, 4))
+    plt.subplot(1, 1, 1)
+    plt.plot(range(1, num_epochs + 1), test_accuracies, 'r-', label='accuracy')
     normalized_times = 1 / np.array(test_times)  # 计算推理时间的倒数
     normalized_times = normalized_times / np.max(normalized_times)  # 归一化
-    plt.plot(range(1, num_epochs + 1), normalized_times, 'g-', label='归一化推理速度')
-    plt.title('测试集准确率与推理速度曲线')
+    plt.plot(range(1, num_epochs + 1), normalized_times*100, 'g-', label='normalized inference speed')
+    plt.title('test accuracy and normalized inference speed')
     plt.xlabel('Epoch')
     plt.ylabel('Accuracy (%) / Normalized Inference Speed')
+    
+    # 标注剪枝时刻
+    if is_prune:
+        for epoch in pruning_epochs:
+            plt.axvline(x=epoch, color='red', linestyle='--', label='prune' if epoch == pruning_epochs[0] else "")
+    
     plt.legend()
-
     plt.tight_layout()
-    plt.savefig(f'{logdir}/training_curves.png')
+    plt.savefig(f'{logdir}/accuracy_and_inference_speed.png')
     plt.close()
 
 # 计算每个滤波器的互信息
