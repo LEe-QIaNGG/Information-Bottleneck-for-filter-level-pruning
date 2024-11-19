@@ -56,6 +56,13 @@ def plot_training_curves(epoch_losses, test_accuracies, test_times, logdir, prun
     plt.title('training loss')
     plt.xlabel('Epoch')
     plt.ylabel('Loss')
+    
+    # 在loss曲线上标注剪枝时刻
+    if is_prune:
+        for epoch in pruning_epochs:
+            plt.axvline(x=epoch, color='red', linestyle='--', label='prune' if epoch == pruning_epochs[0] else "")
+    
+    plt.legend()
     plt.tight_layout()
     plt.savefig(f'{logdir}/training_loss.png')
     plt.close()
@@ -66,6 +73,7 @@ def plot_training_curves(epoch_losses, test_accuracies, test_times, logdir, prun
     plt.plot(range(1, num_epochs + 1), test_accuracies, 'r-', label='accuracy')
     normalized_times = 1 / np.array(test_times)  # 计算推理时间的倒数
     normalized_times = normalized_times / np.max(normalized_times)  # 归一化
+    normalized_times=np.sqrt(normalized_times)
     plt.plot(range(1, num_epochs + 1), normalized_times*100, 'g-', label='normalized inference speed')
     plt.title('test accuracy and normalized inference speed')
     plt.xlabel('Epoch')

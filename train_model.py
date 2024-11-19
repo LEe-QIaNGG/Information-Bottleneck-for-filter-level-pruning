@@ -9,13 +9,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 import time
 import os
+from ray import tune
+from ray.tune import CLIReporter
+from functools import partial
 
 def train_model(config):
     beta = config['beta']
     num_prune = config['num_prune']
-    prune_interval = 5
-    num_epochs = 50
-    is_prune = False
+    prune_interval = config['prune_interval']
+    num_epochs = config['num_epochs']
+    is_prune = config['is_prune']
+    prune_layer1 = config['prune_layer1'] # 是否剪枝第一层
+    prune_layer2 = config['prune_layer2'] # 是否剪枝第二层
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # 设置数据加载和预处理
@@ -90,31 +95,28 @@ def train_model(config):
                 X_mi = X_mi.to(device)
                 output_mi = model(X_mi)
                 # 计算每层的互信息
-                I_XT1, I_TY1 = calculate_filter_mutual_information(X_mi, activations['conv1'], output_mi)
-                I_XT2, I_TY2 = calculate_filter_mutual_information(X_mi, activations['conv2'], output_mi)
-                information_plane_1 = np.array(I_XT1) - beta * np.array(I_TY1)
-                information_plane_2 = np.array(I_XT2) - beta * np.array(I_TY2)
-                # plot_layer_mutual_information(information_plane, 'Conv1', epoch, logdir)
-                top_n_indices_1 = np.argsort(information_plane_1)[-num_prune:][::-1]  # 获取最大的n个索引
-                top_n_values_1 = information_plane_1[top_n_indices_1]  # 获取对应的值
-                top_n_indices_2 = np.argsort(information_plane_2)[-num_prune*2:][::-1]  # 获取最大的n个索引
-                top_n_values_2 = information_plane_2[top_n_indices_2]  # 获取对应的值
+                if prune_layer1:
+                    I_XT1, I_TY1 = calculate_filter_mutual_information(X_mi, activations['conv1'], output_mi)
+                    information_plane_1 = np.array(I_XT1) - beta * np.array(I_TY1)
+                    top_n_indices_1 = np.argsort(information_plane_1)[-num_prune:][::-1]
+                    top_n_values_1 = information_plane_1[top_n_indices_1]
+                    # 对第一层进行剪枝
+                    for idx in top_n_indices_1:
+                        model.conv1.weight.data[idx] = 0
+                        if model.conv1.bias is not None:
+                            model.conv1.bias.data[idx] = 0
+
+                if prune_layer2:
+                    I_XT2, I_TY2 = calculate_filter_mutual_information(X_mi, activations['conv2'], output_mi)
+                    information_plane_2 = np.array(I_XT2) - beta * np.array(I_TY2)
+                    top_n_indices_2 = np.argsort(information_plane_2)[-num_prune*2:][::-1]
+                    top_n_values_2 = information_plane_2[top_n_indices_2]
+                    # 对第二层进行剪枝
+                    for idx in top_n_indices_2:
+                        model.conv2.weight.data[idx] = 0
+                        if model.conv2.bias is not None:
+                            model.conv2.bias.data[idx] = 0
                 
-                # 打印最大的n个值及其索引
-                # for i, (idx, val) in enumerate(zip(top_n_indices_1, top_n_values_1)):
-                #     print(f'Epoch {epoch}: 第{i+1}大信息值 {val:.4f}, 对应filter索引 {idx}')
-                # for i, (idx, val) in enumerate(zip(top_n_indices_2, top_n_values_2)):
-                #     print(f'Epoch {epoch}: 第{i+1}大信息值 {val:.4f}, 对应filter索引 {idx}')
-                
-                # 对这n个filter进行剪枝 - 将权重和偏置设为0
-                for idx in top_n_indices_1:
-                    model.conv1.weight.data[idx] = 0
-                    if model.conv1.bias is not None:
-                        model.conv1.bias.data[idx] = 0
-                for idx in top_n_indices_2:
-                    model.conv2.weight.data[idx] = 0
-                    if model.conv2.bias is not None:
-                        model.conv2.bias.data[idx] = 0
                 pruning_epochs.append(epoch)
         
         # 在测试集上评估模型
@@ -123,14 +125,45 @@ def train_model(config):
         test_times.append(avg_time)
         if epoch % prune_interval == 0:
             metrics.append(accuracy/ avg_time)
-        print(f'Epoch {epoch+1} 测试集准确率: {accuracy:.2f}%')
-        print(f'Epoch {epoch+1} 测试集推理速度: {avg_time:.2f} ms')
+        # print(f'Epoch {epoch+1} 测试集准确率: {accuracy:.2f}%')
+        # print(f'Epoch {epoch+1} 测试集推理速度: {avg_time:.2f} ms')
     # 在训练结束后调用函数
-    plot_training_curves(epoch_losses, test_accuracies, test_times, logdir, pruning_epochs,is_prune)
-    
-if __name__ == '__main__':
+    # plot_training_curves(epoch_losses, test_accuracies, test_times, logdir, pruning_epochs,is_prune)
+
+    return np.mean(metrics)
+
+def tune_hyperparameters(num_samples=10):
     config = {
-        'beta': 2,
-        'num_prune': 1
+        "beta": tune.uniform(0.5, 3.0),
+        "num_prune": tune.choice([2, 4, 6, 8]),
+        "prune_interval": tune.choice([3, 5, 7]),
+        "num_epochs": 50,
+        "is_prune": True,
+        "prune_layer1": tune.choice([True, False]),
+        "prune_layer2": lambda spec: not spec.config.prune_layer1  # 确保与prune_layer1相反
     }
-    train_model(config)
+    
+    reporter = CLIReporter(
+        parameter_columns=["beta", "num_prune", "prune_interval", "prune_layer1", "prune_layer2"],
+        metric_columns=["mean_metric"]
+    )
+
+    analysis = tune.run(
+        train_model,
+        config=config,
+        num_samples=num_samples,
+        progress_reporter=reporter,
+        resources_per_trial={"cpu": 2, "gpu": 0.5},  # 根据您的硬件调整
+        metric="mean_metric",
+        mode="max"
+    )
+    
+    best_config = analysis.get_best_config(metric="mean_metric", mode="max")
+    print("最佳配置:", best_config)
+    return best_config
+
+if __name__ == '__main__':
+    best_config = tune_hyperparameters(num_samples=10)
+    # 使用最佳配置运行最终模型
+    final_metric = train_model(best_config)
+    print(f"使用最佳配置的最终指标: {final_metric}")
